@@ -81,7 +81,7 @@ def parse_docx(file_path: str):
                 clean_text = clean_text.replace("padro", "padrão")
                 clean_text = clean_text.replace("indisponvel", "indisponível",)
                 clean_text = clean_text.replace("teis", "úteis")
-                clean_text = clean_text.replace("", "—") # traço longo ou caracteres desconhecidos
+                clean_text = clean_text.replace("–", "—") # traço longo ou caracteres desconhecidos
                 
                 content_lines.append(clean_text)
                 
