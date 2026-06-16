@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopFlow - CX Support Agent & Dashboard</title>
+    
+    <!-- Fontes Premium do Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons para Ícones Limpos -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js para o Painel de Métricas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Arquivo de Estilos Customizados -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Barra Lateral -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon"><i data-lucide="bot"></i></span>
+                    <div class="logo-text">
+                        <h1>ShopFlow</h1>
+                        <span>Agente Inteligente</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Menu de Navegação -->
+            <nav class="nav-menu">
+                <button class="nav-item active" id="btn-tab-chat" onclick="switchTab('chat')">
+                    <i data-lucide="message-square"></i>
+                    <span>Chat de Suporte</span>
+                </button>
+                <button class="nav-item" id="btn-tab-dashboard" onclick="switchTab('dashboard')">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span>Painel de Métricas</span>
+                </button>
+            </nav>
+            
+            <!-- Painel de Configurações -->
+            <div class="sidebar-config">
+                <h3 class="config-title">
+                    <i data-lucide="settings"></i> Configurações RAG
+                </h3>
+                
+                <div class="config-group">
+                    <label for="gemini-key-input">Gemini API Key</label>
+                    <div class="input-password-wrapper">
+                        <input type="password" id="gemini-key-input" placeholder="Cole sua chave (opcional)" onchange="saveApiKey()">
+                        <button type="button" class="btn-toggle-pass" onclick="togglePasswordVisibility()">
+                            <i data-lucide="eye" id="eye-icon"></i>
+                        </button>
+                    </div>
+                    <span class="config-help">Chave salva localmente. Se omitida, usará o modo demo.</span>
+                </div>
+                
+                <div class="config-group">
+                    <div class="slider-label-row">
+                        <label for="threshold-slider">Limiar de Confiança</label>
+                        <span id="threshold-val">0.25</span>
+                    </div>
+                    <input type="range" id="threshold-slider" min="0.0" max="1.0" step="0.05" value="0.25" oninput="updateThreshold(this.value)">
+                    <span class="config-help">Nota mínima TF-IDF para responder antes de escalar.</span>
+                </div>
+                
+                <div class="config-actions">
+                    <button class="btn-reset-db" onclick="resetSystemData()">
+                        <i data-lucide="trash-2"></i>
+                        <span>Limpar Dados de Teste</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="badge-status-conn">
+                    <span class="dot-online"></span>
+                    <span>API do Agente Online</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Área Principal de Conteúdo -->
+        <main class="main-content">
+            
+            <!-- TABA 1: CHAT DE SUPORTE -->
+            <section id="tab-chat" class="tab-content active">
+                <header class="tab-header">
+                    <div class="header-info">
+                        <h2>Chat de Atendimento</h2>
+                        <p>Fale com a IA da ShopFlow abastecida pela nossa base de conhecimento</p>
+                    </div>
+                    
+                    <div class="header-actions">
+                        <span class="session-badge">Sessão: <strong id="session-id-display">SF-XXXX</strong></span>
+                    </div>
+                </header>
+                
+                <!-- Notificação de Escalação Humana -->
+                <div class="escalation-banner" id="escalation-banner" style="display: none;">
+                    <div class="banner-body">
+                        <div class="pulse-icon"><i data-lucide="user-check"></i></div>
+                        <div class="banner-text">
+                            <h3>Atendimento Humano Solicitado</h3>
+                            <p>Um atendente da ShopFlow foi notificado e você está na fila de prioridade. A IA agora está em modo monitoramento.</p>
+                        </div>
+                    </div>
+                    <span class="badge-human-status">Fila Humana Ativa</span>
+                </div>
+                
+                <!-- Área do Histórico de Conversa -->
+                <div class="chat-history" id="chat-history">
+                    <!-- Mensagem de Boas-vindas Inicial -->
+                    <div class="chat-message agent system-intro">
+                        <div class="message-avatar"><i data-lucide="bot"></i></div>
+                        <div class="message-bubble">
+                            <p>Olá! Eu sou o assistente virtual da **ShopFlow**. Posso te ajudar com dúvidas sobre pagamentos, integrações, onboarding, erros, cancelamentos e planos.</p>
+                            <p>Aqui estão algumas dúvidas frequentes que posso responder com precisão:</p>
+                            <div class="quick-suggest-grid">
+                                <button class="btn-suggest" onclick="sendSuggestedQuestion('Meu pagamento foi recusado. O que fazer?')">
+                                    Meu pagamento foi recusado. O que fazer?
+                                </button>
+                                <button class="btn-suggest" onclick="sendSuggestedQuestion('Como integrar com a API de frete?')">
+                                    Como integrar com a API de frete?
+                                </button>
+                                <button class="btn-suggest" onclick="sendSuggestedQuestion('Qual o prazo de devolução de um produto?')">
+                                    Qual o prazo de devolução?
+                                </button>
+                                <button class="btn-suggest" onclick="sendSuggestedQuestion('Como alterar meu plano mensal?')">
+                                    Como alterar meu plano mensal?
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Indicador de Digitação -->
+                <div class="typing-indicator-wrapper" id="typing-indicator" style="display: none;">
+                    <div class="message-avatar"><i data-lucide="bot"></i></div>
+                    <div class="typing-bubble">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                </div>
+                
+                <!-- Input de Envio de Mensagem -->
+                <footer class="chat-input-area">
+                    <form id="chat-form" onsubmit="handleChatSubmit(event)" class="chat-form">
+                        <input type="text" id="chat-input" placeholder="Digite sua dúvida aqui..." autocomplete="off" required>
+                        <button type="button" class="btn-escalate" id="btn-manual-escalate" onclick="manualEscalate()" title="Falar com humano">
+                            <i data-lucide="user-check"></i>
+                            <span>Falar com Humano</span>
+                        </button>
+                        <button type="submit" class="btn-send" id="btn-submit-send">
+                            <span>Enviar</span>
+                            <i data-lucide="send"></i>
+                        </button>
+                    </form>
+                </footer>
+            </section>
+            
+            <!-- TABA 2: PAINEL DE MÉTRICAS (DASHBOARD) -->
+            <section id="tab-dashboard" class="tab-content">
+                <header class="tab-header">
+                    <div class="header-info">
+                        <h2>Painel de Performance e Métricas</h2>
+                        <p>Acompanhe a eficiência do agente de IA e a taxa de deflexão de suporte em tempo real</p>
+                    </div>
+                </header>
+                
+                <!-- Grid de Cards de Estatísticas -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <span>Taxa de Deflexão</span>
+                            <div class="card-icon blue"><i data-lucide="shield-check"></i></div>
+                        </div>
+                        <div class="metric-card-body">
+                            <h3 id="metric-deflection-rate">0%</h3>
+                            <p>Problemas resolvidos pela IA sem suporte humano</p>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <span>Total de Conversas</span>
+                            <div class="card-icon purple"><i data-lucide="message-square"></i></div>
+                        </div>
+                        <div class="metric-card-body">
+                            <h3 id="metric-total-tickets">0</h3>
+                            <p>Atendimentos totais iniciados na plataforma</p>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <span>Casos Resolvidos</span>
+                            <div class="card-icon green"><i data-lucide="check-circle-2"></i></div>
+                        </div>
+                        <div class="metric-card-body">
+                            <h3 id="metric-resolved-tickets">0</h3>
+                            <p>Tickets concluídos com sucesso pelo Agente RAG</p>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <span>Casos Escalados</span>
+                            <div class="card-icon red"><i data-lucide="user-x"></i></div>
+                        </div>
+                        <div class="metric-card-body">
+                            <h3 id="metric-escalated-tickets">0</h3>
+                            <p>Transferidos para atendente por baixa confiança ou pedido</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Seção de Gráficos -->
+                <div class="dashboard-charts-row">
+                    <div class="chart-box">
+                        <div class="chart-header">
+                            <h4>Distribuição de Resoluções</h4>
+                            <span class="chart-sub">Proporção Resolvido vs Escalado</span>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="resolutionsChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-box">
+                        <div class="chart-header">
+                            <h4>Dúvidas por Categorias</h4>
+                            <span class="chart-sub">Frequência de acesso a artigos da base</span>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="categoriesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabela de Logs de Tickets Recentes -->
+                <div class="tickets-log-box">
+                    <div class="chart-header">
+                        <h4>Log de Atendimentos Recentes</h4>
+                        <span class="chart-sub">Acompanhe as últimas interações em tempo real</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="tickets-table">
+                            <thead>
+                                <tr>
+                                    <th>ID do Ticket</th>
+                                    <th>Última Pergunta do Usuário</th>
+                                    <th>Data/Hora</th>
+                                    <th>Mensagens</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tickets-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Nenhum atendimento registrado.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Script de Lógica do Cliente -->
+    <script src="app.js"></script>
+</body>
+</html>
