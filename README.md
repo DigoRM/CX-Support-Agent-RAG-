@@ -1,3 +1,13 @@
+---
+title: ShopFlow CX Support Agent
+emoji: 🤖
+colorFrom: purple
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # ShopFlow - Agente Inteligente de Suporte ao Cliente (RAG) & Dashboard de Métricas
 
 Este projeto é um **Agente de Suporte de CX Inteligente** baseado em RAG (Retrieval-Augmented Generation) para a plataforma e-commerce fictícia **ShopFlow**. Ele extrai conhecimento de uma base de dados em Word, responde a perguntas dos clientes citando artigos fontes de forma contextualizada, escala chamados de baixa confiança para humanos e fornece um painel de métricas interativo em tempo real.
