@@ -18,6 +18,11 @@ class TestCXSupportSystem(unittest.TestCase):
             os.remove(cls.json_path)
         if os.path.exists(cls.db_path):
             os.remove(cls.db_path)
+            
+        # Cria a base de dados de teste inicial
+        run_indexing(cls.doc_path, cls.json_path)
+        # Inicializa o RAGManager uma única vez para todos os testes!
+        cls.rag = RAGManager(cls.doc_path, cls.json_path)
 
     @classmethod
     def tearDownClass(cls):
@@ -78,14 +83,14 @@ class TestCXSupportSystem(unittest.TestCase):
 
     def test_03_rag_retrieval(self):
         """Testa se a busca RAG funciona por palavras-chave e calcula as similaridades corretas."""
-        rag = RAGManager(self.doc_path, self.json_path)
+        rag = self.rag
         
         # Caso 1: Pergunta muito relacionada ao Artigo 1 (Pagamento recusado)
         results = rag.retrieve("pagamento recusado cartao", top_k=3)
         self.assertTrue(len(results) > 0)
         best_art, best_score = results[0]
         self.assertEqual(best_art["number"], 1)
-        self.assertTrue(best_score > 0.30, f"Score esperado alto, obtido: {best_score}")
+        self.assertTrue(best_score > 0.38, f"Score esperado alto, obtido: {best_score}")
         
         # Caso 2: Pergunta sobre API de frete (Artigo relacionado a APIs)
         results_api = rag.retrieve("frete API integrar", top_k=3)
@@ -95,20 +100,20 @@ class TestCXSupportSystem(unittest.TestCase):
         # Caso 3: Pergunta fora da base de conhecimento (Baixa confiança)
         results_out = rag.retrieve("como plantar flores no jardim", top_k=1)
         best_art_out, best_score_out = results_out[0]
-        # Espera-se que a similaridade seja extremamente baixa
-        self.assertTrue(best_score_out < 0.15, f"Score esperado baixo, obtido: {best_score_out}")
+        # Espera-se que a similaridade semântica seja baixa
+        self.assertTrue(best_score_out < 0.30, f"Score esperado baixo, obtido: {best_score_out}")
 
     def test_04_rag_answer_logic(self):
         """Testa se a lógica de resposta do RAG Manager detecta a baixa confiança para escalação automática."""
-        rag = RAGManager(self.doc_path, self.json_path)
+        rag = self.rag
         
         # Pergunta de alta confiança
-        res_high = rag.answer_query("Meu pagamento deu recusado", chat_history=[], min_confidence=0.25)
+        res_high = rag.answer_query("Meu pagamento deu recusado", chat_history=[], min_confidence=0.35)
         self.assertFalse(res_high["escalated"])
         self.assertEqual(res_high["sources"][0]["number"], 1)
         
         # Pergunta de baixa confiança
-        res_low = rag.answer_query("Qual a distância da Terra à Lua?", chat_history=[], min_confidence=0.25)
+        res_low = rag.answer_query("Qual a distância da Terra à Lua?", chat_history=[], min_confidence=0.35)
         self.assertTrue(res_low["escalated"])
         self.assertIn("suporte humano", res_low["answer"])
 

@@ -4,7 +4,7 @@
 let state = {
     sessionId: "",
     apiKey: "",
-    threshold: 0.25,
+    threshold: 0.35,
     isEscalated: false,
     activeTab: "chat",
     charts: {
@@ -52,7 +52,7 @@ function loadConfig() {
     if (savedThreshold !== null) {
         state.threshold = parseFloat(savedThreshold);
     } else {
-        state.threshold = 0.25;
+        state.threshold = 0.35;
     }
     document.getElementById("threshold-slider").value = state.threshold;
     document.getElementById("threshold-val").innerText = state.threshold.toFixed(2);
