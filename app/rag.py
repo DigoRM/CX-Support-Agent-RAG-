@@ -28,30 +28,26 @@ class RAGManager:
     def initialize_data(self):
         """
         Carrega os artigos processados do arquivo JSON.
-        Se o JSON não existir, dispara a indexação do docx automaticamente.
+        Sempre tenta regerar a partir do docx se disponível para garantir dados atualizados e limpos.
         Em seguida, indexa os documentos no banco vetorial ChromaDB.
         """
-        # Se o arquivo de artigos não existe, tenta gerar
-        if not os.path.exists(self.articles_json_path):
-            doc_file = self.doc_path
-            if not os.path.exists(doc_file):
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                doc_file = os.path.join(base_dir, self.doc_path)
-                
-            if os.path.exists(doc_file):
-                print("Indexador disparado automaticamente por ausência de data/articles.json...")
-                self.articles = run_indexing(doc_file, self.articles_json_path)
-            else:
-                print(f"AVISO: Arquivo docx não encontrado em {self.doc_path}. Tentando carregar JSON existente...")
-                
-        # Carrega o JSON
-        if os.path.exists(self.articles_json_path):
+        doc_file = self.doc_path
+        if not os.path.exists(doc_file):
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            doc_file = os.path.join(base_dir, self.doc_path)
+            
+        if os.path.exists(doc_file):
+            print("Indexador disparado para atualizar base de dados...")
+            self.articles = run_indexing(doc_file, self.articles_json_path)
+        elif os.path.exists(self.articles_json_path):
+            print("AVISO: Arquivo docx não encontrado. Carregando JSON existente...")
             with open(self.articles_json_path, "r", encoding="utf-8") as f:
                 self.articles = json.load(f)
-            print(f"Sucesso: {len(self.articles)} artigos carregados do JSON.")
-            self._build_vector_store()
         else:
             print("ERRO: Nenhuma base de conhecimento disponível na inicialização.")
+            return
+            
+        self._build_vector_store()
 
     def _build_vector_store(self):
         """
