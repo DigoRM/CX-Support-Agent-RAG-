@@ -46,7 +46,9 @@ class Database:
 
     def add_message(self, session_id: str, sender: str, text: str, 
                     sources: Optional[List[Dict[str, Any]]] = None, 
-                    confidence: Optional[float] = None) -> Dict[str, Any]:
+                    confidence: Optional[float] = None,
+                    escalated: Optional[bool] = None,
+                    reason: Optional[str] = None) -> Dict[str, Any]:
         """
         Adiciona uma mensagem ao histórico e atualiza a data de modificação.
         """
@@ -61,6 +63,10 @@ class Database:
             message_obj["sources"] = sources
         if confidence is not None:
             message_obj["confidence"] = confidence
+        if escalated is not None:
+            message_obj["escalated"] = escalated
+        if reason is not None:
+            message_obj["reason"] = reason
 
         conv["messages"].append(message_obj)
         conv["updated_at"] = datetime.now().isoformat()

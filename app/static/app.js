@@ -47,15 +47,8 @@ function loadConfig() {
     state.apiKey = savedKey;
     document.getElementById("gemini-key-input").value = savedKey;
     
-    // Carrega Threshold
-    const savedThreshold = localStorage.getItem("shopflow_threshold");
-    if (savedThreshold !== null) {
-        state.threshold = parseFloat(savedThreshold);
-    } else {
-        state.threshold = 0.35;
-    }
-    document.getElementById("threshold-slider").value = state.threshold;
-    document.getElementById("threshold-val").innerText = state.threshold.toFixed(2);
+    // Fixa o limiar padrão para detecção de incerteza
+    state.threshold = 0.35;
 }
 
 // ==========================================================================
@@ -67,13 +60,6 @@ function saveApiKey() {
                 document.getElementById("gemini-key-input").value;
     state.apiKey = key;
     localStorage.setItem("shopflow_gemini_key", key);
-}
-
-function updateThreshold(val) {
-    const num = parseFloat(val);
-    state.threshold = num;
-    document.getElementById("threshold-val").innerText = num.toFixed(2);
-    localStorage.setItem("shopflow_threshold", num.toString());
 }
 
 function togglePasswordVisibility() {
@@ -182,7 +168,7 @@ async function loadActiveChat() {
                 chatHistory.innerHTML = "";
                 
                 conv.messages.forEach(msg => {
-                    appendMessageBubble(msg.sender, msg.text, msg.sources, msg.confidence);
+                    appendMessageBubble(msg.sender, msg.text, msg.sources, msg.confidence, msg.escalated, msg.reason);
                 });
                 
                 if (conv.status === "escalated") {
@@ -229,7 +215,7 @@ function formatMarkdown(text) {
     return html;
 }
 
-function appendMessageBubble(sender, text, sources = null, confidence = null) {
+function appendMessageBubble(sender, text, sources = null, confidence = null, escalated = false, reason = null) {
     const chatHistory = document.getElementById("chat-history");
     
     const messageDiv = document.createElement("div");
@@ -246,37 +232,108 @@ function appendMessageBubble(sender, text, sources = null, confidence = null) {
     let textHtml = formatMarkdown(text);
     bubbleDiv.innerHTML = `<p>${textHtml}</p>`;
     
-    // Se for o agente e possuir fontes RAG, renderiza a seção de fontes
+    // Se for o agente e possuir fontes RAG, renderiza a seção do Raio-X da Decisão
     if (sender === "agent" && sources && sources.length > 0) {
-        const sourcesId = `sources-${Math.floor(Math.random() * 1000000)}`;
-        const sourcesSection = document.createElement("div");
-        sourcesSection.classList.add("message-sources");
+        const xrayId = `xray-${Math.floor(Math.random() * 1000000)}`;
+        const xraySection = document.createElement("div");
+        xraySection.classList.add("message-xray");
         
-        let sourcesCardsHtml = "";
-        sources.forEach(src => {
-            const scoreBadge = confidence !== null ? `<span class="source-conf">Score: ${confidence.toFixed(2)}</span>` : "";
-            sourcesCardsHtml += `
-                <div class="source-card">
-                    <div class="source-card-header">
-                        <span>Artigo ${src.number} – ${src.title}</span>
-                        ${scoreBadge}
+        // Pega o melhor artigo correspondente (primeiro da lista de retorno do ChromaDB)
+        const bestSrc = sources[0];
+        const scoreVal = confidence !== null ? confidence.toFixed(2) : "0.00";
+        
+        // Configura rótulos e classes de acordo com a decisão cognitiva
+        let decisionTitle = "Resolução Aprovada";
+        let decisionClass = "resolved";
+        let decisionIcon = "shield-check";
+        let decisionDesc = `O Agente analisou a pergunta e confirmou que o <strong>Artigo ${bestSrc.number}</strong> contém a resposta exata. Ele estruturou uma resposta amigável e direta baseada na base.`;
+        
+        if (escalated) {
+            decisionTitle = "Escalação Preventiva";
+            decisionClass = "escalated";
+            decisionIcon = "user-x";
+            
+            // Personaliza a explicação se for o exemplo clássico de frete
+            if (text.toLowerCase().includes("frete") || reason.toLowerCase().includes("frete")) {
+                decisionDesc = `O Agente leu o <strong>Artigo ${bestSrc.number}</strong> (geração de chaves API) e percebeu que ele <strong>NÃO responde</strong> à dúvida específica sobre integração de frete. Para evitar alucinações e erros operacionais, o Agente bloqueou a resposta automática e acionou o suporte humano.<br><small><strong>Motivo:</strong> ${reason || "Incerteza no contexto"}</small>`;
+            } else {
+                decisionDesc = `O Agente analisou o artigo mais próximo recuperado pela busca vetorial. Como as informações foram julgadas <strong>insuficientes ou irrelevantes</strong> para responder com precisão, o Agente ativou a salvaguarda de escalação.<br><small><strong>Motivo:</strong> ${reason || "Baixa confiança"}</small>`;
+            }
+        }
+        
+        // Constrói os cards das outras fontes se houver mais de uma
+        let extraSourcesHtml = "";
+        if (sources.length > 1) {
+            extraSourcesHtml = `<div class="extra-sources-title">Outros artigos buscados:</div>`;
+            sources.slice(1).forEach(src => {
+                extraSourcesHtml += `
+                    <div class="extra-source-item">
+                        <span>Artigo ${src.number} – ${src.title} (${src.category})</span>
                     </div>
-                    <div class="source-cat">${src.category}</div>
-                    <div class="source-body">${src.content}</div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
         
-        sourcesSection.innerHTML = `
-            <button class="source-toggle" onclick="toggleSourcesUI('${sourcesId}', this)">
-                <i data-lucide="chevron-down"></i>
-                <span>Ver artigo fonte (${sources.length})</span>
+        xraySection.innerHTML = `
+            <button class="xray-toggle" onclick="toggleXrayUI('${xrayId}', this)">
+                <i data-lucide="scan-eye"></i>
+                <span>Ver Raio-X da Decisão (ChromaDB vs. Agente)</span>
             </button>
-            <div class="sources-content" id="${sourcesId}">
-                ${sourcesCardsHtml}
+            <div class="xray-content" id="${xrayId}">
+                <div class="xray-split">
+                    <!-- Coluna do Algoritmo de Busca -->
+                    <div class="xray-col algorithm">
+                        <div class="col-header">
+                            <i data-lucide="binary"></i>
+                            <span>Fase 1: Busca Vetorial (ChromaDB)</span>
+                        </div>
+                        <div class="xray-card">
+                            <div class="xray-card-row">
+                                <span class="card-label">Mais Similar:</span>
+                                <span class="card-val highlight">Artigo ${bestSrc.number}</span>
+                            </div>
+                            <div class="xray-card-row">
+                                <span class="card-label">Distância Semântica:</span>
+                                <span class="card-val score-badge">Score: ${scoreVal}</span>
+                            </div>
+                            <div class="xray-card-row title-row">
+                                <span class="card-label">Título:</span>
+                                <span class="card-val">${bestSrc.title}</span>
+                            </div>
+                            <div class="article-preview">
+                                <strong>Trecho extraído do Docx:</strong>
+                                <p>${bestSrc.content}</p>
+                            </div>
+                            ${extraSourcesHtml}
+                            <span class="xray-explanation-note">
+                                * Um buscador tradicional exibiria esse texto diretamente para o cliente, mesmo sem responder à dúvida.
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Coluna do Agente Cognitivo -->
+                    <div class="xray-col agent ${decisionClass}">
+                        <div class="col-header">
+                            <i data-lucide="brain"></i>
+                            <span>Fase 2: Decisão Cognitiva (LLM)</span>
+                        </div>
+                        <div class="xray-card">
+                            <div class="decision-badge ${decisionClass}">
+                                <i data-lucide="${decisionIcon}"></i>
+                                <span>Status: ${decisionTitle}</span>
+                            </div>
+                            <div class="decision-desc">
+                                <p>${decisionDesc}</p>
+                            </div>
+                            <span class="xray-explanation-note">
+                                * O Agente analisa criticamente se a informação é de fato suficiente para responder com total segurança.
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
-        bubbleDiv.appendChild(sourcesSection);
+        bubbleDiv.appendChild(xraySection);
     }
     
     // Se for mensagem de sistema
@@ -310,7 +367,7 @@ function appendMessageBubble(sender, text, sources = null, confidence = null) {
     lucide.createIcons();
 }
 
-function toggleSourcesUI(id, button) {
+function toggleXrayUI(id, button) {
     const content = document.getElementById(id);
     const isShowing = content.classList.toggle("show");
     button.classList.toggle("active", isShowing);
@@ -392,7 +449,7 @@ async function handleChatSubmit(event) {
         typingIndicator.style.display = "none";
         
         if (response.ok) {
-            appendMessageBubble("agent", data.answer, data.sources, data.confidence);
+            appendMessageBubble("agent", data.answer, data.sources, data.confidence, data.escalated, data.reason);
             
             if (data.escalated) {
                 state.isEscalated = true;

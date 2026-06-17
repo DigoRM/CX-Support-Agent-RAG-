@@ -117,7 +117,9 @@ async def chat_endpoint(
         sender="agent",
         text=rag_result["answer"],
         sources=rag_result["sources"],
-        confidence=rag_result["confidence"]
+        confidence=rag_result["confidence"],
+        escalated=rag_result.get("escalated", False),
+        reason=rag_result.get("reason")
     )
     
     # 5. Se o resultado do RAG exigir escalação, marca no banco

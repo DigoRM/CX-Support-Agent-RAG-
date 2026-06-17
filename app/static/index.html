@@ -62,13 +62,31 @@
                     <span class="config-help">Chave salva localmente. Se omitida, usará o modo demo.</span>
                 </div>
                 
-                <div class="config-group">
-                    <div class="slider-label-row">
-                        <label for="threshold-slider">Limiar de Confiança</label>
-                        <span id="threshold-val">0.35</span>
+                <!-- Explicação do Funcionamento do Agente -->
+                <div class="agent-explainer-card">
+                    <h4 class="explainer-title">
+                        <i data-lucide="brain-circuit"></i>
+                        Como o Agente funciona?
+                    </h4>
+                    <p class="explainer-desc">
+                        Diferente de um algoritmo de busca convencional, o Agente de CX opera em duas etapas:
+                    </p>
+                    <div class="explainer-steps">
+                        <div class="explainer-step">
+                            <span class="step-num">1</span>
+                            <div class="step-body">
+                                <strong>Busca Vetorial (ChromaDB)</strong>
+                                <span>Localiza os artigos mais parecidos matematicamente na base.</span>
+                            </div>
+                        </div>
+                        <div class="explainer-step">
+                            <span class="step-num">2</span>
+                            <div class="step-body">
+                                <strong>Decisão Cognitiva (Gemini)</strong>
+                                <span>Lê o artigo e julga se ele responde à pergunta. Se não resolver, ele <strong>escala para humano</strong> em vez de alucinar.</span>
+                            </div>
+                        </div>
                     </div>
-                    <input type="range" id="threshold-slider" min="0.0" max="1.0" step="0.05" value="0.35" oninput="updateThreshold(this.value)">
-                    <span class="config-help">Nota semântica mínima (ChromaDB) para responder.</span>
                 </div>
                 
                 <div class="config-actions">
