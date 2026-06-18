@@ -163,6 +163,13 @@ async def get_conversation_endpoint(session_id: str):
     """
     return db.get_conversation(session_id)
 
+@app.get("/api/articles")
+async def get_articles_endpoint():
+    """
+    Retorna a lista de todos os artigos da base de conhecimento.
+    """
+    return rag.articles
+
 @app.get("/health")
 async def health_endpoint():
     return {

@@ -7,6 +7,7 @@ let state = {
     threshold: 0.35,
     isEscalated: false,
     activeTab: "chat",
+    allArticles: [],
     charts: {
         resolutions: null,
         categories: null
@@ -28,6 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // 4. Carrega histórico do chat se a sessão for nova ou existente
     loadActiveChat();
+    
+    // 5. Carrega todos os artigos da Central de Ajuda
+    fetchArticles();
 });
 
 function initSession() {
@@ -115,10 +119,12 @@ function switchTab(tabName) {
     
     // Atualiza classes ativas nos botões do menu
     document.getElementById("btn-tab-chat").classList.toggle("active", tabName === "chat");
+    document.getElementById("btn-tab-tutorials").classList.toggle("active", tabName === "tutorials");
     document.getElementById("btn-tab-dashboard").classList.toggle("active", tabName === "dashboard");
     
     // Mostra/oculta seções
     document.getElementById("tab-chat").classList.toggle("active", tabName === "chat");
+    document.getElementById("tab-tutorials").classList.toggle("active", tabName === "tutorials");
     document.getElementById("tab-dashboard").classList.toggle("active", tabName === "dashboard");
     
     if (tabName === "dashboard") {
@@ -212,6 +218,10 @@ function formatMarkdown(text) {
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\n/g, '<br>');
+        
+    // Converte referências a "Artigo XX" em links clicáveis interativos
+    html = html.replace(/(Artigo\s+(\d+))/gi, '<a href="#" class="in-text-link" onclick="event.preventDefault(); navigateToArticle($2)">$1</a>');
+    
     return html;
 }
 
@@ -268,7 +278,7 @@ function appendMessageBubble(sender, text, sources = null, confidence = null, es
             sources.slice(1).forEach(src => {
                 extraSourcesHtml += `
                     <div class="extra-source-item">
-                        <span>Artigo ${src.number} – ${src.title} (${src.category})</span>
+                        <a href="#" class="xray-extra-link" onclick="event.preventDefault(); navigateToArticle(${src.number})">Artigo ${src.number} – ${src.title} (${src.category}) <i data-lucide="external-link" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-left:2px;"></i></a>
                     </div>
                 `;
             });
@@ -290,7 +300,7 @@ function appendMessageBubble(sender, text, sources = null, confidence = null, es
                         <div class="xray-card">
                             <div class="xray-card-row">
                                 <span class="card-label">Mais Similar:</span>
-                                <span class="card-val highlight">Artigo ${bestSrc.number}</span>
+                                <span class="card-val"><a href="#" class="xray-link" onclick="event.preventDefault(); navigateToArticle(${bestSrc.number})">Artigo ${bestSrc.number} <i data-lucide="external-link" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-left:2px;"></i></a></span>
                             </div>
                             <div class="xray-card-row">
                                 <span class="card-label">Distância Semântica:</span>
@@ -298,7 +308,7 @@ function appendMessageBubble(sender, text, sources = null, confidence = null, es
                             </div>
                             <div class="xray-card-row title-row">
                                 <span class="card-label">Título:</span>
-                                <span class="card-val">${bestSrc.title}</span>
+                                <span class="card-val"><a href="#" class="xray-link-title" onclick="event.preventDefault(); navigateToArticle(${bestSrc.number})">${bestSrc.title}</a></span>
                             </div>
                             <div class="article-preview">
                                 <strong>Trecho extraído do Docx:</strong>
@@ -686,4 +696,150 @@ function renderTicketsTable(tickets) {
         `;
         body.appendChild(tr);
     });
+}
+
+// ==========================================================================
+// CENTRAL DE AJUDA & TUTORIAIS INTERATIVOS
+// ==========================================================================
+
+async function fetchArticles() {
+    try {
+        const response = await fetch("/api/articles");
+        if (response.ok) {
+            const articles = await response.json();
+            state.allArticles = articles;
+            renderTutorials(articles);
+        } else {
+            console.error("Erro ao buscar artigos do RAG.");
+            document.getElementById("tutorials-categories-grid").innerHTML = `
+                <div class="error-tutorials">Não foi possível carregar os tutoriais da base de dados.</div>
+            `;
+        }
+    } catch (e) {
+        console.error("Erro na requisição dos artigos:", e);
+        document.getElementById("tutorials-categories-grid").innerHTML = `
+            <div class="error-tutorials">Erro ao tentar conectar com a base de dados.</div>
+        `;
+    }
+}
+
+function renderTutorials(articles) {
+    const grid = document.getElementById("tutorials-categories-grid");
+    grid.innerHTML = "";
+    
+    if (!articles || articles.length === 0) {
+        grid.innerHTML = `<div class="empty-search-tutorials">Nenhum tutorial encontrado para a busca realizada.</div>`;
+        return;
+    }
+    
+    // Agrupa os artigos por categoria
+    const categoriesMap = {};
+    articles.forEach(art => {
+        const cat = art.category || "Geral";
+        if (!categoriesMap[cat]) {
+            categoriesMap[cat] = [];
+        }
+        categoriesMap[cat].push(art);
+    });
+    
+    // Ordena as categorias de forma lógica
+    const sortedCategories = Object.keys(categoriesMap).sort();
+    
+    sortedCategories.forEach(cat => {
+        // Remove prefixo "Categoria X:" do título para deixar visualmente premium
+        const cleanCatName = cat.replace(/^Categoria\s+\d+:\s*/i, "");
+        
+        const catCard = document.createElement("div");
+        catCard.classList.add("category-card");
+        
+        const catHeader = document.createElement("h3");
+        catHeader.classList.add("category-card-header");
+        catHeader.innerHTML = `<i data-lucide="folder-open"></i><span>${cleanCatName}</span>`;
+        catCard.appendChild(catHeader);
+        
+        const listDiv = document.createElement("div");
+        listDiv.classList.add("tutorial-items-list");
+        
+        categoriesMap[cat].forEach(art => {
+            const itemDiv = document.createElement("div");
+            itemDiv.classList.add("tutorial-accordion-item");
+            itemDiv.id = `art-node-${art.number}`;
+            
+            itemDiv.innerHTML = `
+                <button class="tutorial-accordion-header" onclick="toggleTutorialAccordion('art-content-${art.number}', this)">
+                    <span class="art-num-badge">Artigo ${art.number}</span>
+                    <span class="art-title-text">${art.title}</span>
+                    <i data-lucide="chevron-down" class="acc-chevron"></i>
+                </button>
+                <div class="tutorial-accordion-content" id="art-content-${art.number}">
+                    <div class="tutorial-body-text">
+                        ${formatMarkdown(art.content)}
+                    </div>
+                </div>
+            `;
+            listDiv.appendChild(itemDiv);
+        });
+        
+        catCard.appendChild(listDiv);
+        grid.appendChild(catCard);
+    });
+    
+    // Inicializa novos ícones do Lucide
+    lucide.createIcons();
+}
+
+function toggleTutorialAccordion(id, header) {
+    const content = document.getElementById(id);
+    const isShowing = content.classList.toggle("show");
+    header.classList.toggle("active", isShowing);
+}
+
+function filterTutorials(query) {
+    const cleanQuery = query.toLowerCase().trim();
+    if (!cleanQuery) {
+        renderTutorials(state.allArticles);
+        return;
+    }
+    
+    const filtered = state.allArticles.filter(art => {
+        return art.title.toLowerCase().includes(cleanQuery) || 
+               art.content.toLowerCase().includes(cleanQuery) ||
+               art.category.toLowerCase().includes(cleanQuery) ||
+               art.number.toString() === cleanQuery;
+    });
+    
+    renderTutorials(filtered);
+}
+
+function navigateToArticle(artNumber) {
+    // 1. Muda para a aba de Central de Ajuda
+    switchTab("tutorials");
+    
+    // Limpa filtros de busca se houver algum
+    document.getElementById("search-tutorials").value = "";
+    renderTutorials(state.allArticles);
+    
+    // 2. Localiza o nó do artigo
+    const artNode = document.getElementById(`art-node-${artNumber}`);
+    if (artNode) {
+        // 3. Rola até o elemento
+        setTimeout(() => {
+            artNode.scrollIntoView({ behavior: "smooth", block: "center" });
+            
+            // 4. Abre o acordeão dele
+            const header = artNode.querySelector(".tutorial-accordion-header");
+            const content = document.getElementById(`art-content-${artNumber}`);
+            
+            if (header && content && !content.classList.contains("show")) {
+                toggleTutorialAccordion(`art-content-${artNumber}`, header);
+            }
+            
+            // 5. Aplica a animação de glow/destaque
+            artNode.classList.add("glow-highlight");
+            setTimeout(() => {
+                artNode.classList.remove("glow-highlight");
+            }, 3000);
+            
+        }, 150);
+    }
 }

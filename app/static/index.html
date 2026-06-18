@@ -39,6 +39,10 @@
                     <i data-lucide="message-square"></i>
                     <span>Chat de Suporte</span>
                 </button>
+                <button class="nav-item" id="btn-tab-tutorials" onclick="switchTab('tutorials')">
+                    <i data-lucide="book-open"></i>
+                    <span>Central de Ajuda</span>
+                </button>
                 <button class="nav-item" id="btn-tab-dashboard" onclick="switchTab('dashboard')">
                     <i data-lucide="bar-chart-3"></i>
                     <span>Painel de Métricas</span>
@@ -288,6 +292,30 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+            </section>
+            
+            <!-- TABA 3: CENTRAL DE AJUDA -->
+            <section id="tab-tutorials" class="tab-content">
+                <header class="tab-header">
+                    <div class="header-info">
+                        <h2>Central de Ajuda & Tutoriais</h2>
+                        <p>Explore todos os 60 artigos da nossa base de conhecimento oficial</p>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box-wrapper">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="search-tutorials" placeholder="Buscar tutoriais..." oninput="filterTutorials(this.value)">
+                        </div>
+                    </div>
+                </header>
+                
+                <div class="tutorials-container-box">
+                    <div class="tutorials-categories-grid" id="tutorials-categories-grid">
+                        <!-- Categorias e artigos serão renderizados aqui dinamicamente -->
+                        <div class="loading-tutorials">
+                            Carregando base de conhecimento...
+                        </div>
                     </div>
                 </div>
             </section>
